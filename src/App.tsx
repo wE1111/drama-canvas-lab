@@ -77,6 +77,48 @@ type DragState =
   | { mode: "node"; nodeId: string; offsetX: number; offsetY: number }
   | null;
 
+const MODE_STEPS: Record<WorkflowMode, Array<{ key: string; label: string; kinds: CanvasNode["kind"][] }>> = {
+  explainer: [
+    { key: "episode", label: "目标", kinds: ["episode"] },
+    { key: "script", label: "脚本", kinds: ["script"] },
+    { key: "character", label: "角色", kinds: ["character"] },
+    { key: "prompt", label: "分镜/提示词", kinds: ["prompt", "scene"] },
+    { key: "image", label: "关键帧", kinds: ["image"] },
+    { key: "video", label: "视频", kinds: ["video"] },
+    { key: "audio", label: "音频", kinds: ["audio"] },
+    { key: "publish", label: "发布", kinds: ["edit", "publish"] }
+  ],
+  story: [
+    { key: "episode", label: "集目标", kinds: ["episode"] },
+    { key: "script", label: "剧本", kinds: ["script"] },
+    { key: "character", label: "角色", kinds: ["character"] },
+    { key: "storyboard", label: "分镜", kinds: ["prompt", "scene"] },
+    { key: "keyframe", label: "关键帧", kinds: ["image"] },
+    { key: "video", label: "视频", kinds: ["video"] },
+    { key: "audio", label: "配音", kinds: ["audio"] },
+    { key: "publish", label: "交付", kinds: ["edit", "publish"] }
+  ],
+  liveAction: [
+    { key: "episode", label: "题材", kinds: ["episode"] },
+    { key: "script", label: "脚本", kinds: ["script"] },
+    { key: "character", label: "演员/人设", kinds: ["character"] },
+    { key: "storyboard", label: "镜头设计", kinds: ["prompt", "scene"] },
+    { key: "keyframe", label: "关键画面", kinds: ["image"] },
+    { key: "video", label: "镜头生成", kinds: ["video"] },
+    { key: "audio", label: "对白/旁白", kinds: ["audio"] },
+    { key: "publish", label: "成片", kinds: ["edit", "publish"] }
+  ],
+  pictureNarration: [
+    { key: "episode", label: "主题", kinds: ["episode"] },
+    { key: "script", label: "文稿", kinds: ["script"] },
+    { key: "prompt", label: "配图提示词", kinds: ["prompt", "scene"] },
+    { key: "image", label: "配图", kinds: ["image"] },
+    { key: "audio", label: "旁白", kinds: ["audio"] },
+    { key: "video", label: "轻视频", kinds: ["video"] },
+    { key: "publish", label: "发布", kinds: ["edit", "publish"] }
+  ]
+};
+
 function buildId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 }
@@ -138,6 +180,16 @@ function createSvgDataUri({
     <text x="122" y="1340" fill="#9fb0c8" font-size="24" font-family="Arial, sans-serif">This is a mock asset shell for the canvas workbench.</text>
   </svg>`;
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+function resolveStepStatus(nodes: CanvasNode[], kinds: CanvasNode["kind"][]) {
+  const matched = nodes.filter((node) => kinds.includes(node.kind));
+  if (matched.length === 0) return "empty";
+  if (matched.some((node) => node.status === "running")) return "running";
+  if (matched.some((node) => node.status === "review")) return "review";
+  if (matched.every((node) => node.status === "done")) return "done";
+  if (matched.some((node) => node.status === "blocked")) return "blocked";
+  return "draft";
 }
 
 function inferGenerationKind(node: CanvasNode): GenerationKind {
@@ -840,6 +892,10 @@ export default function App() {
     ? nodeGenerations.find((item) => item.applied) ?? nodeGenerations[0] ?? null
     : null;
   const activeDocumentTitle = documents.find((doc) => doc.id === activeDocumentId)?.title ?? document.title;
+  const workflowSteps = MODE_STEPS[workflowMode].map((step) => ({
+    ...step,
+    status: resolveStepStatus(document.nodes, step.kinds)
+  }));
 
   return (
     <div className="app-shell">
@@ -891,6 +947,14 @@ export default function App() {
           <p>
             借 `ai-moive-studio` 的结构，但只保留你真正需要的几层：画布交互、右侧助手协议、节点级服务边界、生成历史与应用逻辑、可配置提示词模板。
           </p>
+          <div className="workflow-guide">
+            {workflowSteps.map((step) => (
+              <div key={step.key} className={`workflow-step workflow-step-${step.status}`}>
+                <span>{step.label}</span>
+                <strong>{step.status}</strong>
+              </div>
+            ))}
+          </div>
         </div>
         <div className="hero-meta">
           <div><span>节点</span><strong>{document.nodes.length}</strong></div>
@@ -1021,6 +1085,13 @@ export default function App() {
                     <div className="tool-summary">{tool.summary}</div>
                   </div>
                 ))}
+              </div>
+
+              <div className="quick-actions">
+                <button className="action-button ghost" onClick={() => setAssistantInput(`创建一套${currentPack.label}工作流`)}>创建工作流</button>
+                <button className="action-button ghost" onClick={() => setAssistantInput("优化当前节点")}>优化当前节点</button>
+                <button className="action-button ghost" onClick={() => setAssistantInput("把优化建议写到画布上")}>写优化建议</button>
+                <button className="action-button ghost" onClick={() => setAssistantInput("删除当前节点")}>删除当前节点</button>
               </div>
 
               <div className="assistant-messages">

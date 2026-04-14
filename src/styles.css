@@ -193,6 +193,55 @@ button {
   line-height: 1.7;
 }
 
+.workflow-guide {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.workflow-step {
+  min-width: 120px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(8, 14, 25, 0.78);
+}
+
+.workflow-step span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.workflow-step strong {
+  display: block;
+  margin-top: 8px;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+
+.workflow-step-done strong {
+  color: var(--success);
+}
+
+.workflow-step-running strong {
+  color: var(--cyan);
+}
+
+.workflow-step-review strong {
+  color: var(--gold);
+}
+
+.workflow-step-blocked strong {
+  color: var(--danger);
+}
+
+.workflow-step-draft strong,
+.workflow-step-empty strong {
+  color: var(--muted);
+}
+
 .hero-meta {
   display: grid;
   gap: 12px;
@@ -485,6 +534,12 @@ button {
 .history-list,
 .generation-list {
   display: grid;
+  gap: 10px;
+}
+
+.quick-actions {
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
