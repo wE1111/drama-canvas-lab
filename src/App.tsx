@@ -9,6 +9,7 @@ import {
   type AssistantMutationAPI,
   type AssistantToolEvent
 } from "./assistantMock";
+import { buildAssistantProtocol, type AssistantProtocol } from "./assistantProtocol";
 import { PROMPT_PACKS, DEFAULT_STAGE_BY_KIND, type PromptPack, type PromptStage, type WorkflowMode } from "./promptPresets";
 import { createStarterDocuments, starterDocument, type CanvasDocument, type CanvasEdge, type CanvasNode } from "./sampleWorkflow";
 
@@ -20,6 +21,7 @@ const TEMPLATE_KEY = "drama-canvas-lab.templates.v1";
 const HISTORY_KEY = "drama-canvas-lab.history.v1";
 const GENERATIONS_KEY = "drama-canvas-lab.generations.v1";
 const QUEUE_KEY = "drama-canvas-lab.queue.v1";
+const ASSISTANT_PROTOCOL_KEY = "drama-canvas-lab.assistant-protocol.v1";
 
 const BOARD_WIDTH = 5200;
 const BOARD_HEIGHT = 3200;
@@ -301,6 +303,7 @@ export default function App() {
   const [document, setDocument] = useState<CanvasDocument>(starterDocument);
   const [workflowMode, setWorkflowMode] = useState<WorkflowMode>("explainer");
   const [templates, setTemplates] = useState<Record<WorkflowMode, PromptPack>>(PROMPT_PACKS as Record<WorkflowMode, PromptPack>);
+  const [assistantProtocol, setAssistantProtocol] = useState<AssistantProtocol>(buildAssistantProtocol());
   const [historyMap, setHistoryMap] = useState<HistoryMap>(() => createInitialHistory(starterDocument));
   const [generationMap, setGenerationMap] = useState<GenerationMap>({});
   const [runQueue, setRunQueue] = useState<RunQueueItem[]>([]);
@@ -338,6 +341,7 @@ export default function App() {
       starterDocument;
     const nextMode = loadJson<WorkflowMode>(MODE_KEY, "explainer");
     const nextTemplates = loadJson<Record<WorkflowMode, PromptPack>>(TEMPLATE_KEY, PROMPT_PACKS as Record<WorkflowMode, PromptPack>);
+    const nextProtocol = loadJson<AssistantProtocol>(ASSISTANT_PROTOCOL_KEY, buildAssistantProtocol());
     const nextHistory = loadJson<HistoryMap>(HISTORY_KEY, createInitialHistory(nextDocument));
     const nextGenerations = loadJson<GenerationMap>(GENERATIONS_KEY, {});
     const nextQueue = loadJson<RunQueueItem[]>(QUEUE_KEY, []);
@@ -347,6 +351,7 @@ export default function App() {
     setDocument(nextDocument);
     setWorkflowMode(nextMode);
     setTemplates(nextTemplates);
+    setAssistantProtocol(nextProtocol);
     setHistoryMap(nextHistory);
     setGenerationMap(nextGenerations);
     setRunQueue(nextQueue);
@@ -379,6 +384,10 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(TEMPLATE_KEY, JSON.stringify(templates));
   }, [templates]);
+
+  useEffect(() => {
+    window.localStorage.setItem(ASSISTANT_PROTOCOL_KEY, JSON.stringify(assistantProtocol));
+  }, [assistantProtocol]);
 
   useEffect(() => {
     window.localStorage.setItem(HISTORY_KEY, JSON.stringify(historyMap));
@@ -742,7 +751,8 @@ export default function App() {
       document,
       selectedNode,
       emit,
-      mutate: mutationAPI
+      mutate: mutationAPI,
+      protocol: assistantProtocol
     });
 
     if (!assistantInterrupt) {
@@ -1088,10 +1098,11 @@ export default function App() {
               </div>
 
               <div className="quick-actions">
-                <button className="action-button ghost" onClick={() => setAssistantInput(`创建一套${currentPack.label}工作流`)}>创建工作流</button>
-                <button className="action-button ghost" onClick={() => setAssistantInput("优化当前节点")}>优化当前节点</button>
-                <button className="action-button ghost" onClick={() => setAssistantInput("把优化建议写到画布上")}>写优化建议</button>
-                <button className="action-button ghost" onClick={() => setAssistantInput("删除当前节点")}>删除当前节点</button>
+                {assistantProtocol.quickActions.map((action: AssistantProtocol["quickActions"][number]) => (
+                  <button key={action.id} className="action-button ghost" onClick={() => setAssistantInput(action.message)}>
+                    {action.label}
+                  </button>
+                ))}
               </div>
 
               <div className="assistant-messages">
@@ -1334,6 +1345,48 @@ export default function App() {
                 </button>
                 <div className="template-hint">
                   这些模板借鉴了 `ai-moive-studio` 的结构，但现在是你自己的默认模板，可继续改。
+                </div>
+              </div>
+
+              <div className="subpanel">
+                <strong>助手协议</strong>
+                <label className="field">
+                  <span>System Prompt</span>
+                  <textarea
+                    rows={10}
+                    value={assistantProtocol.systemPrompt}
+                    onChange={(event) =>
+                      setAssistantProtocol((current: AssistantProtocol) => ({
+                        ...current,
+                        systemPrompt: event.target.value
+                      }))
+                    }
+                  />
+                </label>
+                <div className="protocol-list">
+                  {assistantProtocol.actions.map((action: AssistantProtocol["actions"][number]) => (
+                    <div key={action.id} className="protocol-card">
+                      <div className="history-meta">
+                        <strong>{action.label}</strong>
+                        <span>{action.id}</span>
+                      </div>
+                      <div className="generation-summary">{action.description}</div>
+                      <label className="field">
+                        <span>匹配规则</span>
+                        <input
+                          value={action.matcher}
+                          onChange={(event) =>
+                            setAssistantProtocol((current: AssistantProtocol) => ({
+                              ...current,
+                              actions: current.actions.map((item: AssistantProtocol["actions"][number]) =>
+                                item.id === action.id ? { ...item, matcher: event.target.value } : item
+                              )
+                            }))
+                          }
+                        />
+                      </label>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
